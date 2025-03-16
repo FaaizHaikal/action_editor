@@ -9,6 +9,8 @@
 #include "cmd_process.h"
 #include "action.h"
 
+#include <nlohmann/json.hpp>
+
 int Col = STP7_COL;
 int Row = ID_1_ROW;
 int Old_Col;
@@ -939,4 +941,136 @@ void NameCmd()
 	}
 	DrawName();
 	bEdited = true;
+}
+
+std::string get_joint_name(int id)
+{
+	switch(id)
+	{
+	case Action::ID_R_SHOULDER_PITCH:
+		return "right_shoulder_pitch";
+	case Action::ID_L_SHOULDER_PITCH:
+		return "left_shoulder_pitch";
+	case Action::ID_R_SHOULDER_ROLL:
+		return "right_shoulder_roll";
+	case Action::ID_L_SHOULDER_ROLL:
+		return "left_shoulder_roll";
+	case Action::ID_R_ELBOW:
+		return "right_elbow";
+	case Action::ID_L_ELBOW:
+		return "left_elbow";
+	case Action::ID_R_HIP_YAW:
+		return "right_hip_yaw";
+	case Action::ID_L_HIP_YAW:
+		return "left_hip_yaw";
+	case Action::ID_R_HIP_ROLL:
+		return "right_hip_roll";
+	case Action::ID_L_HIP_ROLL:
+		return "left_hip_roll";
+	case Action::ID_R_HIP_PITCH:
+		return "right_hip_pitch";
+	case Action::ID_L_HIP_PITCH:
+		return "left_hip_pitch";
+	case Action::ID_R_KNEE:
+		return "right_knee";
+	case Action::ID_L_KNEE:
+		return "left_knee";
+	case Action::ID_R_ANKLE_PITCH:
+		return "right_ankle_pitch";
+	case Action::ID_L_ANKLE_PITCH:
+		return "left_ankle_pitch";
+	case Action::ID_R_ANKLE_ROLL:
+		return "right_ankle_roll";
+	case Action::ID_L_ANKLE_ROLL:
+		return "left_ankle_roll";
+	case Action::ID_HEAD_PAN:
+		return "neck_yaw";
+	case Action::ID_HEAD_TILT:
+		return "neck_pitch";
+	case Action::ID_R_GRIPPER:
+		return "right_gripper";
+	case Action::ID_L_GRIPPER:
+		return "left_gripper";
+	default:
+		return "unknown";
+	}
+}
+
+double to_angle(double position)
+{
+	return (position - 2048.0) * (360.0 / 4096.0);
+}
+
+std::string get_action_name(int index)
+{
+	Action::PAGE page;
+	Action::GetInstance()->LoadPage(index, &page);
+	return std::string(reinterpret_cast<char*>(page.header.name));
+}
+
+// Write current page to json file
+void WriteJson()
+{
+	nlohmann::json json_action;
+
+	std::string action_name(reinterpret_cast<char*>(Page.header.name));
+
+	json_action["name"] = action_name;
+	json_action["next"] = get_action_name(Page.header.next);
+
+	int invalid_bit_mask_count = 0;
+	for (int i = 0; i < 7; i++)
+	{
+		nlohmann::json json_pose;
+		nlohmann::json json_joint;
+		for (int id=Action::ID_R_SHOULDER_PITCH; id<Action::NUMBER_OF_JOINTS; id++)
+		{
+			if(Page.step[i].position[id] & Action::INVALID_BIT_MASK)
+			{
+				invalid_bit_mask_count++;
+				continue;
+			}
+
+			if (invalid_bit_mask_count > 5) {
+				break;
+			}
+
+			json_joint[get_joint_name(id)] = to_angle(Page.step[i].position[id]);
+		}
+
+		if (invalid_bit_mask_count > 5) {
+			break;
+		}
+
+		json_pose["joints"] = json_joint;
+		json_pose["name"] = "step_" + std::to_string(i);
+
+		double pause_time = Page.step[i].pause * 8.0 / 1000.0;
+		json_pose["pause_time"] = pause_time;
+
+		double time = Page.step[i].time * 8.0 / 1000.0;
+		json_pose["time"] = time;
+	
+		json_pose["speed"] = 0.0;
+
+		json_action["poses"].push_back(json_pose);
+	}
+
+	json_action["start_delay"] = 0.0;
+	json_action["stop_delay"] = 0.0;
+	json_action["time_based"] = true;
+
+	std::string json_str = json_action.dump(4);
+
+	std::string file_name = "../" + action_name + ".json";
+
+	FILE *fp = fopen(file_name.c_str(), "w");
+	if (fp == NULL)
+	{
+		PrintCmd("Failed to open file");
+		return;
+	}
+
+	fprintf(fp, "%s", json_str.c_str());
+	fclose(fp);
 }
