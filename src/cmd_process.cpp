@@ -1018,28 +1018,20 @@ void WriteJson()
 	json_action["name"] = action_name;
 	json_action["next"] = get_action_name(Page.header.next);
 
-	int invalid_bit_mask_count = 0;
-	for (int i = 0; i < 7; i++)
+	// int invalid_bit_mask_count = 0;
+	for (int i = 0; i < Page.header.stepnum; i++)
 	{
 		nlohmann::json json_pose;
 		nlohmann::json json_joint;
 		for (int id=Action::ID_R_SHOULDER_PITCH; id<Action::NUMBER_OF_JOINTS; id++)
 		{
-			if(Page.step[i].position[id] & Action::INVALID_BIT_MASK)
+			double position = 0.0;
+			if(!(Page.step[i].position[id] & Action::INVALID_BIT_MASK))
 			{
-				invalid_bit_mask_count++;
-				continue;
+				position = to_angle(Page.step[i].position[id]);
 			}
 
-			if (invalid_bit_mask_count > 5) {
-				break;
-			}
-
-			json_joint[get_joint_name(id)] = to_angle(Page.step[i].position[id]);
-		}
-
-		if (invalid_bit_mask_count > 5) {
-			break;
+			json_joint[get_joint_name(id)] = position;
 		}
 
 		json_pose["joints"] = json_joint;
