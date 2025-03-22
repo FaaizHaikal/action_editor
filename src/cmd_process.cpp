@@ -1038,7 +1038,7 @@ void WriteJson()
 		json_pose["name"] = "step_" + std::to_string(i);
 
 		double pause_time = Page.step[i].pause * 8.0 / 1000.0;
-		json_pose["pause_time"] = pause_time;
+		json_pose["pause"] = pause_time;
 
 		double time = Page.step[i].time * 8.0 / 1000.0;
 		json_pose["time"] = time;
